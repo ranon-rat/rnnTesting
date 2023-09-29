@@ -2,6 +2,7 @@ package brain
 
 import (
 	"encoding/json"
+	"log"
 	"math/rand"
 	"os"
 	"time"
@@ -18,7 +19,6 @@ func NewNeuralNetwork(neuronsPerLayer []int, activationFuncs []string, comment s
 	rand.Seed(time.Now().Unix())
 	if len(activationFuncs)+1 < len(neuronsPerLayer) {
 		panic("the activation funcs are different")
-
 	}
 	// the output doesnt have a weight
 	// the same for the bias
@@ -48,7 +48,7 @@ func NewNeuralNetwork(neuronsPerLayer []int, activationFuncs []string, comment s
 // this is like the predict function
 // but it returns you the layers
 
-func (net NN) FeedFoward(input []float32, feedBack [][]float32) (layers [][]float32, feed [][]float32) {
+func (net *NN) FeedFoward(input []float32, feedBack [][]float32) (layers [][]float32, feed [][]float32) {
 	layers = make([][]float32, len(net.Bias)+1)
 	feed = make([][]float32, len(net.Bias)-1)
 	layers[0] = make([]float32, len(input))
@@ -63,7 +63,7 @@ func (net NN) FeedFoward(input []float32, feedBack [][]float32) (layers [][]floa
 			for i, w := range net.Weights[l][n] {
 				var q float32
 				if l != len(net.Bias)-1 && feedBack != nil && l != 0 {
-					q = (feedBack[l-1][n])
+					q = feedBack[l-1][n]
 
 				}
 				layers[l+1][i] += w * (layers[l][n] + q)
@@ -89,7 +89,7 @@ func (net NN) FeedFoward(input []float32, feedBack [][]float32) (layers [][]floa
 }
 
 // you know why this is for
-func (net NN) Predict(input []float32, bef [][]float32) ([]float32, [][]float32) {
+func (net *NN) Predict(input []float32, bef [][]float32) ([]float32, [][]float32) {
 	lays, feed := net.FeedFoward(input, bef)
 	return lays[len(lays)-1], feed
 
@@ -103,7 +103,7 @@ func (net *NN) BackPropagation(layers [][]float32, bef [][]float32, expected []f
 	layer := layers[len(layers)-1]
 	// I dont need to explain this one
 	for i, n := range layer {
-		errors[i] = (n - expected[i])
+		errors[i] = n - expected[i]
 	}
 
 	for l := len(net.Bias) - 1; l >= 0; l-- {
@@ -113,14 +113,14 @@ func (net *NN) BackPropagation(layers [][]float32, bef [][]float32, expected []f
 		for i := range net.Bias[l] {
 			//gradient=errors*dy/dx(fx)(layer[l+1])
 
-			bd[l][i] += ((errors[i]) * MathFuncs[net.ActivationFuncs[l]]["derivative"](layer[i]))
+			bd[l][i] += (errors[i]) * MathFuncs[net.ActivationFuncs[l]]["derivative"](layer[i])
 		}
 		//layer_t *gradient
 		for n := 0; n < len(wd[l]); n++ {
 			wd[l][n] = make([]float32, len(net.Weights[l][n]))
 			var q float32
 			if l != len(net.Bias)-1 && bef != nil && l != 0 {
-				q = (bef[l-1][n])
+				q = bef[l-1][n]
 
 			}
 			for i := range net.Weights[l][n] {
@@ -174,21 +174,20 @@ func (net *NN) UpdateWeightAndBias(size, learningRate float32, weightsGrad [][][
 
 // the model is saved in a json format
 func (net *NN) SaveModel(name string) {
-
-	f, _ := os.Create(name)
-
-	json.NewEncoder(f).Encode(net)
-
+	f, err := os.Create(name)
+	if err = json.NewEncoder(f).Encode(net); err != nil {
+		log.Println(err)
+	}
 }
 
 // json format
 func OpenModel(name string) NN {
 	var net NN
 	f, err := os.Open(name)
-	if err != nil {
+	if err = json.NewDecoder(f).Decode(&net); err != nil {
 		panic(name + " doesnt exist ")
 	}
-	json.NewDecoder(f).Decode(&net)
+
 	return net
 
 }
